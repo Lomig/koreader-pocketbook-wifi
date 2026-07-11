@@ -27,8 +27,10 @@ userpatch.registerPatchPluginFunc("bookorbit", function(plugin)
 
     local off_task
     off_task = function()
-        -- Book snapshot jobs are async and may still be running.
-        if plugin.getSyncCoordinator and plugin:getSyncCoordinator():isBusy() then
+        -- Book snapshot and sweep jobs are async and may still be running,
+        -- and a connection attempt may still be in flight.
+        if (plugin.getSyncCoordinator and plugin:getSyncCoordinator():isBusy())
+                or NetworkMgr.pending_connection then
             UIManager:scheduleIn(SETTLE_SECONDS, off_task)
             return
         end
@@ -96,6 +98,23 @@ userpatch.registerPatchPluginFunc("bookorbit", function(plugin)
                 end
             end
             return orig_snapshot(self, opts)
+        end
+    end
+
+    -- The full library sweep ("sync all books") also brings Wi-Fi up through
+    -- willRerunWhenOnline, with no turn-off of its own. Its completion isn't
+    -- reachable from here, so lean on off_task's isBusy() polling: schedule
+    -- the drop now, it keeps rescheduling itself until the sweep is done.
+    local orig_sweep = plugin.requestSweep
+    if type(orig_sweep) == "function" then
+        plugin.requestSweep = function(self, ...)
+            if not NetworkMgr:isConnected() then
+                cycle_active = true
+            end
+            if cycle_active then
+                scheduleOff()
+            end
+            return orig_sweep(self, ...)
         end
     end
 
