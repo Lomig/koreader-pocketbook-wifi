@@ -6,8 +6,12 @@ NetConnectSilent(NULL) connects without any UI, but only works while the
 network agent is running — on a cold boot it returns NET_ABORTED (-12).
 So: power the radio, try NetConnectSilent, and if that fails start the agent
 with `netagent net on; netagent connect_silent`, retrying NetConnectSilent
-while polling the connection state. Falls back to the stock dialog after
-15 s, so nothing is lost when there's no known network around.
+while polling the connection state. When nothing connects, interactive
+attempts (the Wi-Fi toggle in the network menu) fall back to the stock
+system dialog; background attempts (auto syncs, beforeWifiAction) give up
+quietly and power the radio back down — nobody wants the network picker
+popping up on a beach because a sync fired. The background attempt is also
+kept shorter so the radio is off again before standby freezes us.
 
 Tested on an Era (FW6). The netagent commands aren't documented anywhere;
 they come from running strings(1) on the binary.
@@ -39,7 +43,8 @@ int NetConnectSilent(const char *name);
 
 local NETAGENT = "/ebrmain/bin/netagent"
 local CONNECT_LOG = DataStorage:getDataDir() .. "/wifi-connect.log"
-local POLL_SECONDS = 15
+local POLL_SECONDS_INTERACTIVE = 15
+local POLL_SECONDS_SILENT = 10
 
 local keepWifiAlive = userpatch.getUpValue(NetworkMgr.turnOnWifi, "keepWifiAlive")
 local orig_turnOnWifi = NetworkMgr.turnOnWifi
@@ -104,7 +109,7 @@ function NetworkMgr:turnOnWifi(complete_callback, interactive)
                 return
             end
         end
-        if iter < POLL_SECONDS then
+        if iter < (interactive and POLL_SECONDS_INTERACTIVE or POLL_SECONDS_SILENT) then
             UIManager:scheduleIn(1, poll)
         else
             local p = io.popen("timeout 5 " .. NETAGENT .. " status 2>&1")
@@ -112,7 +117,19 @@ function NetworkMgr:turnOnWifi(complete_callback, interactive)
             if p then p:close() end
             logger.info("wifi patch: silent connect timed out; QueryNetwork =",
                 inkview.QueryNetwork(), "; netagent said:", out, "; status:", agent_status)
-            orig_turnOnWifi(self, complete_callback, interactive)
+            if interactive then
+                orig_turnOnWifi(self, complete_callback, interactive)
+            else
+                -- No known network around. _abortWifiConnection powers the
+                -- radio down (through turnOffWifi) and clears
+                -- pending_connection so later attempts aren't refused.
+                logger.info("wifi patch: giving up quietly (background attempt)")
+                if self._abortWifiConnection then
+                    self:_abortWifiConnection()
+                else
+                    self:turnOffWifi()
+                end
+            end
         end
     end
     UIManager:scheduleIn(1, poll)
