@@ -77,12 +77,45 @@ userpatch.registerPatchPluginFunc("bookorbit", function(plugin)
             end
             if cycle_active then
                 local prev_on_finish = opts.on_finish
+                -- The device can enter standby right after a suspend sync, so
+                -- a delayed turn-off may never run and the radio would stay
+                -- on for the whole night. Turn it off right away there.
+                local immediate = opts.reason == "suspend"
                 opts.on_finish = function()
                     if prev_on_finish then pcall(prev_on_finish) end
-                    scheduleOff()
+                    if immediate then
+                        UIManager:unschedule(off_task)
+                        cycle_active = false
+                        if NetworkMgr:isWifiOn() then
+                            logger.info("bookorbit wifi patch: suspend sync done, dropping wifi")
+                            NetworkMgr:afterWifiAction()
+                        end
+                    else
+                        scheduleOff()
+                    end
                 end
             end
             return orig_snapshot(self, opts)
+        end
+    end
+
+    -- BookOrbit reads page stats from statistics.sqlite3, but on suspend it
+    -- can capture before the statistics plugin has flushed the current
+    -- session to disk, so the snapshot comes out empty (pageStats=0). Flush
+    -- statistics first. On close ReaderUI flushes everything beforehand, so
+    -- only the suspend path needs this.
+    local orig_suspend = plugin._onSuspend
+    if type(orig_suspend) == "function" then
+        local function suspendWithFlush(self, ...)
+            local stats = self.ui and self.ui.statistics
+            if stats and stats.insertDB then
+                pcall(stats.insertDB, stats)
+            end
+            return orig_suspend(self, ...)
+        end
+        plugin._onSuspend = suspendWithFlush
+        if plugin.onSuspend == orig_suspend then
+            plugin.onSuspend = suspendWithFlush
         end
     end
 
