@@ -14,6 +14,12 @@ plus a couple of things around it:
 - `2-pocketbook-net-diag.lua` — throwaway probe that dumps the state of the
   network stack to `wifi-diag.txt`. Not needed by the fixes; kept around
   because it's how the netagent commands below were found.
+- `2-bookorbit-wifi-cycle.lua` — only relevant with the BookOrbit plugin: its
+  suspend/resume syncs bring Wi-Fi up but never turn it off on devices
+  without a Wi-Fi manager, and the suspend snapshot was captured before the
+  statistics plugin flushed the session to disk (so it pushed empty stats).
+  With this, closing the cover flushes stats, syncs, and powers the radio
+  down before the device sleeps.
 
 ## Install
 
