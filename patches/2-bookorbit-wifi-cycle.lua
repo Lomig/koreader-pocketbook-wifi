@@ -22,6 +22,10 @@ local userpatch = require("userpatch")
 
 local SETTLE_SECONDS = 8
 
+-- Points at the current plugin instance's cycle reset; see the turnOffWifi
+-- hook below.
+local clear_cycle
+
 userpatch.registerPatchPluginFunc("bookorbit", function(plugin)
     local cycle_active = false
 
@@ -44,6 +48,27 @@ userpatch.registerPatchPluginFunc("bookorbit", function(plugin)
     local function scheduleOff()
         UIManager:unschedule(off_task)
         UIManager:scheduleIn(SETTLE_SECONDS, off_task)
+    end
+
+    -- cycle_active means "the current wifi session was started by a sync".
+    -- A failed connection attempt would leave it set with no completion to
+    -- consume it, and the next sync completing during a wifi session the
+    -- user started would then wrongly power the radio down. Every radio-off
+    -- path funnels through turnOffWifi, so reset the flag there: after that,
+    -- a set flag can only refer to the session it was set for. Hooked once,
+    -- after all userpatches have loaded (this runs at plugin instantiation),
+    -- so we wrap the fixed turnOffWifi rather than the stock one.
+    clear_cycle = function()
+        cycle_active = false
+        UIManager:unschedule(off_task)
+    end
+    if not NetworkMgr._bookorbit_cycle_hooked then
+        NetworkMgr._bookorbit_cycle_hooked = true
+        local orig_turnOffWifi = NetworkMgr.turnOffWifi
+        NetworkMgr.turnOffWifi = function(self, ...)
+            if clear_cycle then clear_cycle() end
+            return orig_turnOffWifi(self, ...)
+        end
     end
 
     -- updateProgress/getProgress defer themselves through willRerunWhenOnline
