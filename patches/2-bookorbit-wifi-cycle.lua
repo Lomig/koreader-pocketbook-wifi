@@ -4,12 +4,12 @@ manager (e.g. PocketBook): bring the network up when a sync needs it, drop
 it again once the sync settles.
 
 The plugin already turns Wi-Fi off after suspend syncs, but only on
-hasWifiManager devices, and its periodic every-N-pages push deliberately does
-nothing while offline. So: make the periodic push request networking like the
-lifecycle syncs do, and whenever a sync brought Wi-Fi up on its own account,
-run NetworkMgr:afterWifiAction() a few seconds after the work is done — that
-keeps the "Action when done with Wi-Fi" setting in charge of what happens.
-Wi-Fi that was already on when the sync started is left alone.
+hasWifiManager devices. So: whenever a sync brought Wi-Fi up on its own
+account, run NetworkMgr:afterWifiAction() once the work is done — that keeps
+the "Action when done with Wi-Fi" setting in charge of what happens. Wi-Fi
+that was already on when the sync started is left alone, and the periodic
+every-N-pages push keeps its stock behavior (passive while offline; the
+suspend sync picks the stats up).
 --]]
 
 local Device = require("device")
@@ -116,16 +116,6 @@ userpatch.registerPatchPluginFunc("bookorbit", function(plugin)
         plugin._onSuspend = suspendWithFlush
         if plugin.onSuspend == orig_suspend then
             plugin.onSuspend = suspendWithFlush
-        end
-    end
-
-    -- The stock periodic push relies on the connection being already up and
-    -- silently does nothing offline.
-    plugin.periodic_push_task = function()
-        plugin.periodic_push_scheduled = false
-        plugin.page_update_counter = 0
-        if plugin.settings.auto_sync and (plugin.settings.pages_before_update or 0) > 0 then
-            plugin:requestProgressPush(true, false, "periodic")
         end
     end
 
