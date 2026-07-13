@@ -120,15 +120,17 @@ function NetworkMgr:turnOnWifi(complete_callback, interactive)
             if interactive then
                 orig_turnOnWifi(self, complete_callback, interactive)
             else
-                -- No known network around. _abortWifiConnection powers the
-                -- radio down (through turnOffWifi) and clears
-                -- pending_connection so later attempts aren't refused.
+                -- No known network around. Clear pending_connection (so later
+                -- attempts aren't refused) via _abortWifiConnection, then
+                -- power the radio down explicitly: on PocketBook (no seamless
+                -- toggle) _abortWifiConnection does NOT turn Wi-Fi off itself,
+                -- which would otherwise leave the radio on after a failed
+                -- background attempt.
                 logger.info("wifi patch: giving up quietly (background attempt)")
                 if self._abortWifiConnection then
                     self:_abortWifiConnection()
-                else
-                    self:turnOffWifi()
                 end
+                self:turnOffWifi()
             end
         end
     end
