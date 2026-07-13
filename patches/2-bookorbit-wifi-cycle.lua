@@ -10,6 +10,10 @@ the "Action when done with Wi-Fi" setting in charge of what happens. Wi-Fi
 that was already on when the sync started is left alone, and the periodic
 every-N-pages push keeps its stock behavior (passive while offline; the
 suspend sync picks the stats up).
+
+The plugin's "skip sync when offline" option is also relaxed here: with this
+patch installed, being offline is not a reason to skip — the sync brings
+Wi-Fi up itself.
 --]]
 
 local Device = require("device")
@@ -133,6 +137,9 @@ userpatch.registerPatchPluginFunc("bookorbit", function(plugin)
     local orig_sweep = plugin.requestSweep
     if type(orig_sweep) == "function" then
         plugin.requestSweep = function(self, ...)
+            logger.info("bookorbit wifi patch: sweep requested; wifiOn =",
+                NetworkMgr:isWifiOn(), "connected =", NetworkMgr:isConnected(),
+                "online =", NetworkMgr:isOnline())
             if not NetworkMgr:isConnected() then
                 cycle_active = true
             end
@@ -140,6 +147,19 @@ userpatch.registerPatchPluginFunc("bookorbit", function(plugin)
                 scheduleOff()
             end
             return orig_sweep(self, ...)
+        end
+    end
+
+    -- skip_sync_when_offline makes _onSuspend/_onResume bail out before they
+    -- can bring Wi-Fi up — self-defeating with this patch installed, since
+    -- bringing Wi-Fi up for a sync is its whole point. Let the syncs proceed;
+    -- the silent-connect patch gives up quietly when no known network is
+    -- around, so nothing nags on the beach. Login is still checked before
+    -- this in _onSuspend, so we only relax the offline gate.
+    if type(plugin.shouldSkipAutoSyncOffline) == "function" then
+        plugin.shouldSkipAutoSyncOffline = function(_self, event)
+            logger.info("bookorbit wifi patch: not skipping offline sync for", event)
+            return false
         end
     end
 
