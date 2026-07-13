@@ -163,7 +163,11 @@ userpatch.registerPatchPluginFunc("bookorbit", function(plugin)
     --
     -- This replaces the stock skip_sync_when_offline gate entirely; the
     -- BookOrbit setting no longer matters with this patch installed.
-    local CONNECTING_EVENTS = { suspend = true, network_disconnecting = true }
+    local CONNECTING_EVENTS = {
+        suspend = true,              -- cover closed / standby
+        close = true,                -- book closed (exit to library)
+        network_disconnecting = true, -- push just before Wi-Fi goes down
+    }
     if type(plugin.shouldSkipAutoSyncOffline) == "function" then
         plugin.shouldSkipAutoSyncOffline = function(_self, event)
             if CONNECTING_EVENTS[event] then return false end
