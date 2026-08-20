@@ -7,9 +7,9 @@ quitting KOReader and the battery drains overnight. Do the full teardown
 instead: NetDisconnect() -> netagent net off -> WiFiPower(0)
 -> netagent wifi off.
 
-The final `netagent wifi off` matters on FW6, where WiFiPower(0) alone can
-leave the radio up (reported by Mark31415 in issue #1); on FW7 (Era Lite)
-WiFiPower(0) already triggers it, so there it's a harmless no-op.
+The final `netagent wifi off` matters on units where WiFiPower(0) alone can
+leave the radio up (reported by Mark31415 in issue #1); on others (e.g. Era
+Lite, fw 6.10) WiFiPower(0) already triggers it, so it's a harmless no-op.
 --]]
 
 local Device = require("device")
