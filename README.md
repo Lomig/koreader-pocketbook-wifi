@@ -1,7 +1,8 @@
 # KOReader PocketBook Wi-Fi patches
 
-Userpatches for KOReader on PocketBook, tested on an Era (FW6) with KOReader
-2026.03. They fix [koreader/koreader#12705](https://github.com/koreader/koreader/issues/12705)
+Userpatches for KOReader on PocketBook, tested on an Era (FW6), a Verse
+(Vivlio) and an Era Lite (FW7), with KOReader 2026.03 and 2026.07. They fix
+[koreader/koreader#12705](https://github.com/koreader/koreader/issues/12705)
 plus a couple of things around it:
 
 - `2-pocketbook-wifi-off.lua` — "Wi-Fi off" actually powers the radio down.
@@ -33,16 +34,25 @@ Copy the `.lua` files to `applications/koreader/patches/` on the device
 Tools → Patch management. Log output ends up in
 `applications/koreader/crash.log`.
 
-## Notes on the FW6 network stack
+## Notes on the PocketBook network stack (FW6/FW7)
 
 Things that took a while to figure out:
 
 - The full Wi-Fi teardown is `NetDisconnect()` → `netagent net off` →
-  `WiFiPower(0)`. All three are synchronous, no sleeps needed.
-- `/ebrmain/bin/netagent` is what actually manages the network on FW6 (it
-  runs wpa_supplicant). Besides `net on`/`net off`/`status` it has
-  undocumented `connect_silent` and `essid_silent` commands, found with
-  strings(1) on the binary.
+  `WiFiPower(0)` → `netagent wifi off`. All synchronous, no sleeps needed.
+  The last step matters on some FW6 units where `WiFiPower(0)` alone leaves
+  the radio up (issue #1); on FW7 `WiFiPower(0)` triggers it by itself, so
+  there it's a no-op.
+- `/ebrmain/bin/netagent` is what actually manages the network (it runs
+  wpa_supplicant). Besides `net on`/`net off`/`status` it has undocumented
+  `connect_silent` and `essid_silent` commands, found with strings(1) on the
+  binary.
+- FW7 (Era Lite) uses the same netagent machinery unchanged: cold-boot
+  `NetConnectSilent` still returns NET_ABORTED (-12), and
+  `netagent net on; netagent connect_silent` still connects in a few
+  seconds. One visible difference: FW7's netagent echoes every invocation
+  (`netagent called with parameters < … >`) to stdout, which ends up in
+  crash.log — handy for debugging.
 - `NetConnectSilent(NULL)` only works while the agent is running: on a cold
   boot it returns NET_ABORTED (-12), but after `netagent net on` the same
   call connects within a few seconds. The old profile APIs

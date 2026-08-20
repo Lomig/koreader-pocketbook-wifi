@@ -13,8 +13,9 @@ quietly and power the radio back down — nobody wants the network picker
 popping up on a beach because a sync fired. The background attempt is also
 kept shorter so the radio is off again before standby freezes us.
 
-Tested on an Era (FW6). The netagent commands aren't documented anywhere;
-they come from running strings(1) on the binary.
+Tested on an Era (FW6), a Verse (Vivlio) and an Era Lite (FW7). The netagent
+commands aren't documented anywhere; they come from running strings(1) on
+the binary.
 --]]
 
 local Device = require("device")
