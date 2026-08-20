@@ -15,11 +15,16 @@ plus a couple of things around it:
   network stack to `wifi-diag.txt`. Not needed by the fixes; kept around
   because it's how the netagent commands below were found.
 - `2-bookorbit-wifi-cycle.lua` — only relevant with the BookOrbit plugin: its
-  suspend/resume syncs bring Wi-Fi up but never turn it off on devices
-  without a Wi-Fi manager, and the suspend snapshot was captured before the
-  statistics plugin flushed the session to disk (so it pushed empty stats).
-  With this, closing the cover flushes stats, syncs, and powers the radio
-  down before the device sleeps.
+  put-away syncs (sleep, closing a book) never bring Wi-Fi up on their own on
+  devices without a Wi-Fi manager, and the suspend snapshot was captured
+  before the statistics plugin flushed the session to disk (so it pushed
+  empty stats). With this, closing the cover flushes stats, connects, syncs,
+  and powers the radio down before the device sleeps. Ported 2026-08-20 to
+  the plugin's lifecycle-outbox API (plugin builds from 2026-08-06 on); the
+  pre-outbox plugin needs the previous revision of this file. Suspend cycles
+  use a fast 2 s radio-off check: on devices where the firmware owns the
+  sleep (Era Lite), the process can be frozen a few seconds after the sync
+  settles, and a slower check would leave the radio on all night.
 
 ## Install
 
